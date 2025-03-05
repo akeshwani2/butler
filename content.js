@@ -6,11 +6,29 @@ const OPENAI_API_KEY = '';
 // Add at the top with other constants
 let currentEmailId = null;
 
+const AUTOMATED_SENDERS = [
+  'noreply@',         // Common no-reply addresses
+  'no-reply@',        // Alternative no-reply format
+  'donotreply@',      // Another no-reply variant
+  'notifications@',   // Generic notifications
+  'updates@',         // Generic updates
+  'digest@',         // Digest emails
+  'mailer-daemon@'    // System emails
+];
+
+const BANK_SENDERS = [
+  '@chase.com',        // Chase
+  '@bankofamerica.com', // Bank of America
+  '@capitalone.com',   // Capital One
+  '@wellsfargo.com',   // Wells Fargo
+  '@citi.com'         // Citibank
+];
+
 const EMAIL_LABELS = {
   NEEDS_ACTION: { text: 'Needs Action', color: '#d93025', textColor: 'white' },
   MEETING: { text: 'Meeting', color: '#1a73e8', textColor: 'white' },
   FOLLOW_UP: { text: 'Follow Up', color: '#188038', textColor: 'white' },
-  FYI: { text: 'FYI', color: '#806ef9', textColor: 'white' },
+  BANK: { text: 'Bank', color: '#1E4620', textColor: 'white' }, // Dark green for bank notifications
   NEWSLETTER: { text: 'Newsletter', color: '#f6bf26', textColor: 'black' },
   AUTOMATED: { text: 'Automated', color: '#e8eaed', textColor: '#666' }
 };
@@ -123,14 +141,14 @@ async function processEmailRow(row) {
     const subject = row.querySelector('.bog')?.textContent || '';
     const snippet = row.querySelector('.y2')?.textContent || '';
     
-    // Find the subject container - this is where we'll insert our label
-    const subjectContainer = row.querySelector('.a4W, .xT');
-    if (!subjectContainer) {
-      console.log('No subject container found');
+    // Find the sender name container in Gmail's new interface
+    const senderNameContainer = row.querySelector('.yX.xY');
+    if (!senderNameContainer) {
+      console.log('No sender name container found');
       return;
     }
     
-    const sender = row.querySelector('.yP, .zF')?.textContent || '';
+    const sender = senderNameContainer.textContent || '';
     console.log('Extracted content:', { subject, snippet, sender });
 
     // Create email content object
@@ -146,22 +164,23 @@ async function processEmailRow(row) {
     loadingLabel.className = 'ai-label loading';
     loadingLabel.textContent = '...';
     loadingLabel.style.cssText = `
-      font-size: 12px;
+      font-size: 11px;
       padding: 0 6px;
-      margin-right: 8px;
+      margin-left: 6px;
       display: inline-block;
       background-color: #f1f3f4;
       color: #666;
-      line-height: 18px;
-      height: 18px;
-      border-radius: 4px;
+      line-height: 16px;
+      height: 16px;
+      border-radius: 3px;
       vertical-align: middle;
       position: relative;
       z-index: 1;
+      white-space: nowrap;
     `;
     
-    // Insert loading label before the subject
-    subjectContainer.insertBefore(loadingLabel, subjectContainer.firstChild);
+    // Insert loading label after the sender name
+    senderNameContainer.parentElement.insertBefore(loadingLabel, senderNameContainer.nextSibling);
     
     // Get the label
     const labelType = getEmailLabel(emailContent);
@@ -173,16 +192,16 @@ async function processEmailRow(row) {
     label.className = 'ai-label';
     label.textContent = labelConfig.text;
     label.style.cssText = `
-      font-size: 12px;
+      font-size: 11px;
       padding: 0 6px;
-      margin-right: 8px;
+      margin-left: 6px;
       display: inline-block;
       background-color: ${labelConfig.color};
       color: ${labelConfig.textColor};
       font-weight: 500;
-      line-height: 18px;
-      height: 18px;
-      border-radius: 4px;
+      line-height: 16px;
+      height: 16px;
+      border-radius: 3px;
       vertical-align: middle;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
       transition: all 0.2s ease;
@@ -190,6 +209,8 @@ async function processEmailRow(row) {
       user-select: none;
       position: relative;
       z-index: 1;
+      white-space: nowrap;
+      margin-right: 10px;
     `;
     
     // Replace loading label with actual label
@@ -764,19 +785,31 @@ function getEmailLabel(emailContent) {
   const { subject, body, sender } = emailContent;
   const fullText = `${subject} ${body}`.toLowerCase();
   
+  // Check bank senders first
+  if (BANK_SENDERS.some(bankDomain => sender.toLowerCase().includes(bankDomain)) ||
+      fullText.includes('account alert') ||
+      fullText.includes('balance is below') ||
+      fullText.includes('account balance') ||
+      fullText.includes('available balance') ||
+      fullText.includes('account ending in') ||
+      fullText.includes('overdrawn')
+  ) {
+    return 'BANK';
+  }
+
+  // Check other automated senders
+  if (AUTOMATED_SENDERS.some(blacklisted => sender.toLowerCase().includes(blacklisted))) {
+    return 'AUTOMATED';
+  }
+
   // Meeting patterns
   if (
-    fullText.includes('calendar') ||
-    fullText.includes('scheduled') ||
-    fullText.includes('meeting') ||
-    fullText.includes('zoom') ||
-    fullText.includes('google meet') ||
-    fullText.includes('teams meeting') ||
-    fullText.includes('webinar') ||
-    fullText.includes('conference') ||
-    /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/i.test(fullText) || // Date patterns
-    /\b\d{1,2}[:h]\d{2}\b/.test(fullText) || // Time patterns
-    /(?:scheduled|starts at|ends at)\b/.test(fullText)
+    sender.toLowerCase().includes('@calendly.com') ||  // Calendly emails
+    /\b(?:meeting|conference|webinar)\b/i.test(fullText) ||
+    /\b(?:zoom|google meet|teams|calendly)\b/i.test(fullText) ||
+    /calendar invite|scheduled for|agenda for|new event|accepted:|declined:/i.test(fullText) ||
+    /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}(?:st|nd|rd|th)?\s*(?:,|\bat\b)\s*\d{1,2}[:h]\d{2}/i.test(fullText) || // More specific date+time pattern
+    /(?:starts|begins|ends)\s+at\s+\d{1,2}[:h]\d{2}/i.test(fullText) // More specific time pattern
   ) {
     return 'MEETING';
   }
@@ -795,6 +828,13 @@ function getEmailLabel(emailContent) {
     fullText.includes('attention needed') ||
     fullText.includes('please update') ||
     fullText.includes('pending approval') ||
+    fullText.includes('offer letter') ||
+    fullText.includes('job offer') ||
+    fullText.includes('offer signature') ||
+    fullText.includes('employment offer') ||
+    fullText.includes('business proposal') ||
+    fullText.includes('partnership opportunity') ||
+    /\boffer\b/.test(fullText) ||
     /by\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(fullText) ||
     /\bdue\s+(?:today|tomorrow|this week)\b/i.test(fullText) ||
     (body.includes('?') && !fullText.includes('unsubscribe')) // Question mark but not in newsletters
@@ -840,23 +880,6 @@ function getEmailLabel(emailContent) {
     return 'NEWSLETTER';
   }
 
-  // FYI patterns
-  if (
-    fullText.includes('fyi') ||
-    fullText.includes('for your information') ||
-    fullText.includes('for your reference') ||
-    fullText.includes('just letting you know') ||
-    fullText.includes('thought you might be interested') ||
-    fullText.includes('sharing this with you') ||
-    fullText.includes('wanted to share') ||
-    /^fwd:/i.test(subject) ||
-    /^fw:/i.test(subject) ||
-    /\bfyi:/.test(fullText) ||
-    /keeping you (?:posted|updated|informed)/i.test(fullText)
-  ) {
-    return 'FYI';
-  }
-
-  // Default to Automated for anything else
+  // Default to Automated for anything else (including former FYI)
   return 'AUTOMATED';
 }
