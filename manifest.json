@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "Gmail AI Reply Assistant",
+    "version": "1.0",
+    "description": "Adds custom action buttons to Gmail with AI-powered reply",
+    "content_scripts": [
+      {
+        "matches": ["*://mail.google.com/*"],
+        "js": ["content.js"],
+        "css": ["styles.css"]
+      }
+    ],
+    "permissions": ["activeTab"],
+    "host_permissions": [
+      "https://api.openai.com/*"
+    ]
+  }
+ 

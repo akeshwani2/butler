@@ -1,0 +1,171 @@
+.custom-actions-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    margin: 0 -16px;  /* Extend to full width */
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+    z-index: 1;
+    background-color: #fff;  /* Match Gmail's header background */
+ }
+ 
+ 
+ .action-button {
+    padding: 6px 12px;  /* Slightly smaller padding to match Gmail's header buttons */
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;  /* Match Gmail's font size */
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 1px solid #dadce0;
+    background-color: #fff;
+ }
+ 
+ 
+ .archive {
+    color: #444;
+ }
+ 
+ 
+ .reply {
+    background-color: #1a73e8;
+    color: white;
+    border: 1px solid #1a73e8;
+ }
+ 
+ 
+ .forward {
+    color: #444;
+ }
+ 
+ 
+ .action-button:hover {
+    background-color: #f1f3f4;
+ }
+ 
+ 
+ .reply:hover {
+    background-color: #1765cc;
+ }
+ 
+ 
+ .loading-indicator {
+    display: inline-block;
+    margin-left: 8px;
+    animation: spin 1s linear infinite;
+ }
+ 
+ 
+ @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+ }
+ 
+ 
+ .ai-response-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+ }
+ 
+ 
+ .ai-response-container {
+    background: white;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+ }
+ 
+ 
+ .ai-response-header {
+    padding: 16px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+ }
+ 
+ 
+ .ai-response-content {
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 60vh;
+ }
+ 
+ 
+ .ai-response-actions {
+    padding: 16px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+ }
+ 
+ 
+ .ai-action-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+ }
+ 
+ 
+ .use-response {
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+ }
+ 
+ 
+ .cancel {
+    background-color: #f1f3f4;
+    color: #444;
+    border: 1px solid #dadce0;
+ }
+ 
+ 
+ .suggested-action {
+    background-color: #e8f0fe !important;
+    border-color: #1a73e8 !important;
+    box-shadow: 0 0 0 2px #1a73e8 !important;
+ }
+ 
+ 
+ .shortcut-indicator {
+    margin-left: 4px;
+    animation: pulse 1.5s infinite;
+    font-weight: bold;
+ }
+ 
+ 
+ /* Specific styling for the shortcut indicator on reply button */
+ .action-button.reply .shortcut-indicator {
+    color: white !important;  /* Make text white for visibility on blue background */
+    text-shadow: 0 0 2px rgba(0,0,0,0.2);  /* Add subtle shadow for better readability */
+ }
+ 
+ 
+ /* Shortcut indicator color for non-reply buttons */
+ .action-button:not(.reply) .shortcut-indicator {
+    color: #1a73e8;  /* Blue color for archive and forward buttons */
+ }
+ 
+ 
+ @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+ }
+  
+ 
