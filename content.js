@@ -17,11 +17,7 @@ const AUTOMATED_SENDERS = [
 ];
 
 const BANK_SENDERS = [
-  '@chase.com',        // Chase
-  '@bankofamerica.com', // Bank of America
-  '@capitalone.com',   // Capital One
-  '@wellsfargo.com',   // Wells Fargo
-  '@citi.com'         // Citibank
+  '@chase.com',
 ];
 
 const EMAIL_LABELS = {
@@ -224,42 +220,197 @@ async function processEmailRow(row) {
 
 // Insert custom action buttons
 function insertActionButtons(container) {
- // Check if action bar already exists
- if (container.querySelector('.custom-actions-bar')) {
-   return;
- }
+  // Check if action bar already exists
+  if (container.querySelector('.custom-actions-bar')) {
+    return;
+  }
 
+  // Create the action buttons bar with modern styling
+  const actionBar = document.createElement('div');
+  actionBar.className = 'custom-actions-bar';
+  actionBar.style.cssText = `
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  `;
 
- // Create the action buttons bar with some margin
- const actionBar = document.createElement('div');
- actionBar.className = 'custom-actions-bar';
- actionBar.style.marginTop = '8px';  // Add some spacing below the title
   // Archive button
- const archiveBtn = document.createElement('button');
- archiveBtn.className = 'action-button archive';
- archiveBtn.innerHTML = 'Archive';
- archiveBtn.addEventListener('click', archiveEmail);
+  const archiveBtn = document.createElement('button');
+  archiveBtn.className = 'action-button archive';
+  archiveBtn.innerHTML = 'Archive';
+  archiveBtn.style.cssText = `
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    background: white;
+    color: #444746;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  `;
+  archiveBtn.addEventListener('click', archiveEmail);
+  archiveBtn.addEventListener('mouseover', () => {
+    archiveBtn.style.backgroundColor = '#f6f8fc';
+    archiveBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+  });
+  archiveBtn.addEventListener('mouseout', () => {
+    archiveBtn.style.backgroundColor = 'white';
+    archiveBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+  });
+
   // AI Reply button
- const replyBtn = document.createElement('button');
- replyBtn.className = 'action-button reply';
- replyBtn.innerHTML = 'Reply';
- replyBtn.addEventListener('click', generateAIReply);
+  const replyBtn = document.createElement('button');
+  replyBtn.className = 'action-button reply';
+  replyBtn.innerHTML = 'Reply';
+  replyBtn.style.cssText = `
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    background: #1a73e8;
+    color: white !important;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  `;
+
+  // Add a style tag for pseudo-classes
+  const style = document.createElement('style');
+  style.textContent = `
+    .action-button.reply {
+      color: white !important;
+      background-color: #1a73e8 !important;
+    }
+    .action-button.reply:active {
+      color: white !important;
+      background-color: #174ea6 !important;
+    }
+    .action-button.reply:focus {
+      color: white !important;
+    }
+    .action-button.reply:focus-visible {
+      color: white !important;
+      outline: 2px solid #1a73e8;
+      outline-offset: 2px;
+    }
+    .action-button.reply .shortcut-indicator {
+      color: white !important;
+      opacity: 1;
+    }
+    .shortcut-indicator {
+      margin-left: 8px;
+      font-weight: 500;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      animation: pulse 1.5s infinite;
+    }
+    .shortcut-indicator .key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 4px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      text-transform: uppercase;
+    }
+    .action-button:not(.reply) .shortcut-indicator .key {
+      background: rgba(0, 0, 0, 0.05);
+      color: #1a73e8;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  replyBtn.addEventListener('click', generateAIReply);
+  replyBtn.addEventListener('mouseover', () => {
+    replyBtn.style.backgroundColor = '#1557b0';
+    replyBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+  });
+  replyBtn.addEventListener('mouseout', () => {
+    replyBtn.style.backgroundColor = '#1a73e8';
+    replyBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+  });
+  replyBtn.addEventListener('mousedown', () => {
+    replyBtn.style.backgroundColor = '#174ea6';
+    replyBtn.style.transform = 'scale(0.98)';
+    replyBtn.style.color = 'white';
+  });
+  replyBtn.addEventListener('mouseup', () => {
+    replyBtn.style.backgroundColor = '#1557b0';
+    replyBtn.style.transform = 'scale(1)';
+    replyBtn.style.color = 'white';
+  });
+
   // Forward button
- const forwardBtn = document.createElement('button');
- forwardBtn.className = 'action-button forward';
- forwardBtn.innerHTML = 'Forward';
- forwardBtn.addEventListener('click', forwardEmail);
+  const forwardBtn = document.createElement('button');
+  forwardBtn.className = 'action-button forward';
+  forwardBtn.innerHTML = 'Forward';
+  forwardBtn.style.cssText = `
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    background: white;
+    color: #444746;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  `;
+  forwardBtn.addEventListener('click', forwardEmail);
+  forwardBtn.addEventListener('mouseover', () => {
+    forwardBtn.style.backgroundColor = '#f6f8fc';
+    forwardBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.12)';
+  });
+  forwardBtn.addEventListener('mouseout', () => {
+    forwardBtn.style.backgroundColor = 'white';
+    forwardBtn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+  });
+
   // Add buttons to the action bar
- actionBar.appendChild(archiveBtn);
- actionBar.appendChild(replyBtn);
- actionBar.appendChild(forwardBtn);
+  actionBar.appendChild(archiveBtn);
+  actionBar.appendChild(replyBtn);
+  actionBar.appendChild(forwardBtn);
+
   // Insert the action bar after the container
- container.appendChild(actionBar);
+  container.appendChild(actionBar);
+
   // Add AI analysis with console logs for debugging
- console.log('Triggering AI analysis for buttons...');
- analyzeEmailForAction([archiveBtn, replyBtn, forwardBtn]).catch(err => {
-   console.error('Error during email analysis:', err);
- });
+  console.log('Triggering AI analysis for buttons...');
+  analyzeEmailForAction([archiveBtn, replyBtn, forwardBtn]).catch(err => {
+    console.error('Error during email analysis:', err);
+  });
 }
 
 
@@ -691,31 +842,34 @@ async function getSuggestedAction(emailContent) {
  return data.choices[0].message.content.trim().toLowerCase();
 }
 
-// Simplify highlightSuggestedAction back to original version
+// Modify the highlightSuggestedAction function
 function highlightSuggestedAction(button) {
- // Clear previous highlights
- document.querySelectorAll('.suggested-action').forEach(b => {
-   b.classList.remove('suggested-action');
-   b.querySelector('.shortcut-indicator')?.remove();
- });
+  // Clear previous highlights
+  document.querySelectorAll('.suggested-action').forEach(b => {
+    b.classList.remove('suggested-action');
+    b.querySelector('.shortcut-indicator')?.remove();
+  });
 
- // Add highlight and shortcut indicator
- button.classList.add('suggested-action');
- const shortcutText = document.createElement('span');
- shortcutText.className = 'shortcut-indicator';
- 
- const shortcuts = {
-   'archive': 'e',
-   'reply': 'r',
-   'forward': 'f'
- };
- 
- const action = button.classList.contains('archive') ? 'archive'
-              : button.classList.contains('reply') ? 'reply'
-              : 'forward';
-             
- shortcutText.textContent = ` (press ${shortcuts[action]})`;
- button.appendChild(shortcutText);
+  // Add highlight and shortcut indicator
+  button.classList.add('suggested-action');
+  const shortcutText = document.createElement('span');
+  shortcutText.className = 'shortcut-indicator';
+  
+  const shortcuts = {
+    'archive': 'e',
+    'reply': 'r',
+    'forward': 'f'
+  };
+  
+  const action = button.classList.contains('archive') ? 'archive'
+               : button.classList.contains('reply') ? 'reply'
+               : 'forward';
+              
+  const keySpan = document.createElement('span');
+  keySpan.className = 'key';
+  keySpan.textContent = shortcuts[action];
+  shortcutText.appendChild(keySpan);
+  button.appendChild(shortcutText);
 }
 
 
@@ -832,6 +986,8 @@ function getEmailLabel(emailContent) {
     fullText.includes('job offer') ||
     fullText.includes('offer signature') ||
     fullText.includes('employment offer') ||
+    fullText.includes('next steps') ||
+    fullText.includes('important') ||
     fullText.includes('business proposal') ||
     fullText.includes('partnership opportunity') ||
     /\boffer\b/.test(fullText) ||
