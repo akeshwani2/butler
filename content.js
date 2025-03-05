@@ -6,6 +6,15 @@ const OPENAI_API_KEY = '';
 // Add at the top with other constants
 let currentEmailId = null;
 
+const EMAIL_LABELS = {
+  NEEDS_ACTION: { text: 'Needs Action', color: '#d93025', textColor: 'white' },
+  MEETING: { text: 'Meeting', color: '#1a73e8', textColor: 'white' },
+  FOLLOW_UP: { text: 'Follow Up', color: '#188038', textColor: 'white' },
+  FYI: { text: 'FYI', color: '#806ef9', textColor: 'white' },
+  NEWSLETTER: { text: 'Newsletter', color: '#f6bf26', textColor: 'black' },
+  AUTOMATED: { text: 'Automated', color: '#e8eaed', textColor: '#666' }
+};
+
 
 // Initialize extension
 window.addEventListener('load', () => {
@@ -18,68 +27,77 @@ window.addEventListener('load', () => {
 function setupUnifiedObserver() {
   console.log('Setting up unified observer...');
   
-  // Keep track of processed emails
-  const processedEmails = new Set();
+  // Keep track of processed emails using a more robust identifier
+  const processedEmails = new Map();
   
   // Create a more efficient observer
   const observer = new MutationObserver((mutations) => {
-    // Batch process mutations
-    const emailRows = new Set();
-    const emailViews = new Set();
-    
-    mutations.forEach(mutation => {
-      mutation.addedNodes.forEach(node => {
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-        
-        // Check for email list items
-        if (node.matches?.('tr.zA, [role="row"]')) {
-          emailRows.add(node);
+    // Debounce the processing to avoid overwhelming during rapid updates
+    clearTimeout(window._emailProcessTimeout);
+    window._emailProcessTimeout = setTimeout(() => {
+      console.log('Observer triggered, processing updates...');
+      
+      // Find all email rows - both processed and unprocessed
+      const emailRows = document.querySelectorAll('tr.zA');
+      console.log('Found email rows:', emailRows.length);
+
+      emailRows.forEach(row => {
+        // Get a unique identifier for the email (try multiple approaches)
+        const emailId = row.getAttribute('data-legacy-last-message-id') || 
+                       row.getAttribute('data-message-id') ||
+                       row.querySelector('[data-legacy-message-id]')?.getAttribute('data-legacy-message-id') ||
+                       row.querySelector('[email]')?.getAttribute('email') + '_' + 
+                       row.querySelector('.bog')?.textContent; // Fallback to sender + subject
+
+        if (!emailId) {
+          console.log('Could not get email identifier for row');
+          return;
         }
-        
-        // Check for email view container
-        const emailContainer = node.querySelector?.('.ha h2') || 
-                             node.querySelector?.('[data-message-id] .ha h2');
-        if (emailContainer) {
-          emailViews.add(emailContainer.closest('.ha') || emailContainer.closest('[data-message-id]'));
-        }
-        
-        // Also check if the mutation target itself is or contains what we're looking for
-        if (mutation.target.matches?.('tr.zA, [role="row"]')) {
-          emailRows.add(mutation.target);
-        }
-        const targetContainer = mutation.target.querySelector?.('.ha h2') || 
-                              mutation.target.querySelector?.('[data-message-id] .ha h2');
-        if (targetContainer) {
-          emailViews.add(targetContainer.closest('.ha') || targetContainer.closest('[data-message-id]'));
+
+        // Check if we need to reprocess this row
+        const needsProcessing = !processedEmails.has(emailId) || 
+                              !row.querySelector('.ai-label') ||
+                              row.querySelector('.ai-label.loading');
+
+        if (needsProcessing) {
+          console.log('Processing/reprocessing row:', emailId);
+          processEmailRow(row);
+          processedEmails.set(emailId, Date.now());
         }
       });
-    });
-    
-    // Process email rows (list view)
-    emailRows.forEach(row => {
-      const emailId = row.getAttribute('data-legacy-message-id') || 
-                     row.getAttribute('data-message-id');
-      
-      if (emailId && !processedEmails.has(emailId)) {
-        processedEmails.add(emailId);
-        processEmailRow(row);
+
+      // Cleanup old entries from processedEmails (older than 1 hour)
+      const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      for (const [id, timestamp] of processedEmails.entries()) {
+        if (timestamp < oneHourAgo) {
+          processedEmails.delete(id);
+        }
       }
-    });
+    }, 100); // Small delay to batch updates
     
-    // Process email views (opened email)
-    emailViews.forEach(container => {
-      if (!container.querySelector('.custom-actions-bar')) {
-        insertActionButtons(container);
-      }
-    });
+    // Handle email detail view
+    const emailDetailContainer = document.querySelector('.ha h2')?.closest('.ha') ||
+                               document.querySelector('[data-message-id]');
+    
+    if (emailDetailContainer && !emailDetailContainer.querySelector('.custom-actions-bar')) {
+      insertActionButtons(emailDetailContainer);
+    }
   });
-  
-  // Start observing with a more specific configuration
+
+  // Start observing with a more comprehensive configuration
   observer.observe(document.body, {
     childList: true,
     subtree: true,
-    attributes: false,
+    attributes: true,
+    attributeFilter: ['class', 'style'], // Watch for visibility changes
     characterData: false
+  });
+
+  // Also try to process existing rows immediately
+  console.log('Processing existing rows...');
+  const existingRows = document.querySelectorAll('tr.zA');
+  existingRows.forEach(row => {
+    processEmailRow(row);
   });
 }
 
@@ -87,11 +105,34 @@ function setupUnifiedObserver() {
 // Process a single email row
 async function processEmailRow(row) {
   try {
+    console.log('Processing row:', row);
+
+    // Remove any stale or loading labels
+    const existingLabel = row.querySelector('.ai-label');
+    if (existingLabel?.classList.contains('loading')) {
+      existingLabel.remove();
+    }
+
+    // Skip if we already have a valid label
+    if (row.querySelector('.ai-label:not(.loading)')) {
+      console.log('Row already has valid label, skipping');
+      return;
+    }
+
     // Extract minimal information needed for classification
-    const subject = row.querySelector('.bqe, .bog')?.textContent || '';
+    const subject = row.querySelector('.bog')?.textContent || '';
     const snippet = row.querySelector('.y2')?.textContent || '';
-    const sender = row.querySelector('.yX.xY span[email], .ag6')?.textContent || '';
     
+    // Find the subject container - this is where we'll insert our label
+    const subjectContainer = row.querySelector('.a4W, .xT');
+    if (!subjectContainer) {
+      console.log('No subject container found');
+      return;
+    }
+    
+    const sender = row.querySelector('.yP, .zF')?.textContent || '';
+    console.log('Extracted content:', { subject, snippet, sender });
+
     // Create email content object
     const emailContent = {
       sender,
@@ -99,57 +140,61 @@ async function processEmailRow(row) {
       subject,
       body: snippet
     };
+
+    // Create loading label
+    const loadingLabel = document.createElement('span');
+    loadingLabel.className = 'ai-label loading';
+    loadingLabel.textContent = '...';
+    loadingLabel.style.cssText = `
+      font-size: 12px;
+      padding: 0 6px;
+      margin-right: 8px;
+      display: inline-block;
+      background-color: #f1f3f4;
+      color: #666;
+      line-height: 18px;
+      height: 18px;
+      border-radius: 4px;
+      vertical-align: middle;
+      position: relative;
+      z-index: 1;
+    `;
     
-    // Add loading state
-    const subjectElement = row.querySelector('.bqe, .bog');
-    if (subjectElement) {
-      const loadingLabel = document.createElement('span');
-      loadingLabel.className = 'ai-action-label loading';
-      loadingLabel.textContent = '...';
-      loadingLabel.style.cssText = `
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 3px;
-        margin-left: 8px;
-        display: inline-block;
-        background-color: #f1f3f4;
-        color: #666;
-      `;
-      subjectElement.appendChild(loadingLabel);
-      
-      // Get the action suggestion
-      const action = await getSuggestedAction(emailContent);
-      
-      // Replace loading label with actual label
-      const label = document.createElement('span');
-      label.className = 'ai-action-label';
-      label.style.cssText = `
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 3px;
-        margin-left: 8px;
-        display: inline-block;
-      `;
-      
-      // Style based on action
-      switch(action) {
-        case 'archive':
-          label.style.backgroundColor = '#e8eaed';
-          label.style.color = '#666';
-          break;
-        case 'reply':
-          label.style.backgroundColor = '#1a73e8';
-          label.style.color = 'white';
-          break;
-        case 'forward':
-          label.style.backgroundColor = '#188038';
-          label.style.color = 'white';
-          break;
-      }
-      
-      label.textContent = action.toUpperCase();
-      loadingLabel.replaceWith(label);
-    }
+    // Insert loading label before the subject
+    subjectContainer.insertBefore(loadingLabel, subjectContainer.firstChild);
+    
+    // Get the label
+    const labelType = getEmailLabel(emailContent);
+    console.log('Got label type:', labelType);
+    const labelConfig = EMAIL_LABELS[labelType];
+    
+    // Create the label element
+    const label = document.createElement('span');
+    label.className = 'ai-label';
+    label.textContent = labelConfig.text;
+    label.style.cssText = `
+      font-size: 12px;
+      padding: 0 6px;
+      margin-right: 8px;
+      display: inline-block;
+      background-color: ${labelConfig.color};
+      color: ${labelConfig.textColor};
+      font-weight: 500;
+      line-height: 18px;
+      height: 18px;
+      border-radius: 4px;
+      vertical-align: middle;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+      cursor: default;
+      user-select: none;
+      position: relative;
+      z-index: 1;
+    `;
+    
+    // Replace loading label with actual label
+    loadingLabel.replaceWith(label);
+    console.log('Label added successfully');
   } catch (error) {
     console.error('Error processing email row:', error);
   }
@@ -712,4 +757,106 @@ function setupEnterHandler(action) {
 
  // Add the new handler
  document.addEventListener('keydown', handleEnterKey);
+}
+
+// Fast email classification without API calls
+function getEmailLabel(emailContent) {
+  const { subject, body, sender } = emailContent;
+  const fullText = `${subject} ${body}`.toLowerCase();
+  
+  // Meeting patterns
+  if (
+    fullText.includes('calendar') ||
+    fullText.includes('scheduled') ||
+    fullText.includes('meeting') ||
+    fullText.includes('zoom') ||
+    fullText.includes('google meet') ||
+    fullText.includes('teams meeting') ||
+    fullText.includes('webinar') ||
+    fullText.includes('conference') ||
+    /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/i.test(fullText) || // Date patterns
+    /\b\d{1,2}[:h]\d{2}\b/.test(fullText) || // Time patterns
+    /(?:scheduled|starts at|ends at)\b/.test(fullText)
+  ) {
+    return 'MEETING';
+  }
+
+  // Needs Action patterns
+  if (
+    fullText.includes('urgent') ||
+    fullText.includes('asap') ||
+    fullText.includes('action required') ||
+    fullText.includes('action needed') ||
+    fullText.includes('please review') ||
+    fullText.includes('please confirm') ||
+    fullText.includes('deadline') ||
+    fullText.includes('due by') ||
+    fullText.includes('required') ||
+    fullText.includes('attention needed') ||
+    fullText.includes('please update') ||
+    fullText.includes('pending approval') ||
+    /by\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(fullText) ||
+    /\bdue\s+(?:today|tomorrow|this week)\b/i.test(fullText) ||
+    (body.includes('?') && !fullText.includes('unsubscribe')) // Question mark but not in newsletters
+  ) {
+    return 'NEEDS_ACTION';
+  }
+
+  // Follow Up patterns
+  if (
+    fullText.includes('follow up') ||
+    fullText.includes('following up') ||
+    fullText.includes('checking in') ||
+    fullText.includes('touching base') ||
+    fullText.includes('circling back') ||
+    fullText.includes('reminder') ||
+    fullText.includes('status update') ||
+    fullText.includes('any updates') ||
+    fullText.includes('gentle reminder') ||
+    fullText.includes('waiting for your response') ||
+    /^re:\s*re:/i.test(subject) || // Multiple Re: prefixes
+    /haven['']t heard back/i.test(fullText)
+  ) {
+    return 'FOLLOW_UP';
+  }
+
+  // Newsletter/Automated patterns
+  if (
+    sender.includes('noreply') ||
+    sender.includes('no-reply') ||
+    sender.includes('donotreply') ||
+    sender.includes('notification') ||
+    sender.includes('updates') ||
+    sender.includes('newsletter') ||
+    sender.includes('digest') ||
+    sender.includes('mailer-daemon') ||
+    sender.includes('automated') ||
+    fullText.includes('unsubscribe') ||
+    fullText.includes('view in browser') ||
+    fullText.includes('email preferences') ||
+    /^(?:weekly|monthly|daily)\s+(?:update|digest|newsletter)/i.test(subject) ||
+    /\[.*\]/.test(subject) // Subject contains square brackets, common in automated emails
+  ) {
+    return 'NEWSLETTER';
+  }
+
+  // FYI patterns
+  if (
+    fullText.includes('fyi') ||
+    fullText.includes('for your information') ||
+    fullText.includes('for your reference') ||
+    fullText.includes('just letting you know') ||
+    fullText.includes('thought you might be interested') ||
+    fullText.includes('sharing this with you') ||
+    fullText.includes('wanted to share') ||
+    /^fwd:/i.test(subject) ||
+    /^fw:/i.test(subject) ||
+    /\bfyi:/.test(fullText) ||
+    /keeping you (?:posted|updated|informed)/i.test(fullText)
+  ) {
+    return 'FYI';
+  }
+
+  // Default to Automated for anything else
+  return 'AUTOMATED';
 }
